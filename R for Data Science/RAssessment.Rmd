@@ -1,0 +1,237 @@
+---
+title: "Data Science R Assessment"
+author: "Yves Greatti"
+date: "2023-08-19"
+output:
+  html_document:
+    theme: united
+    code_folding: hide
+    highlight: tango
+    df_print: tibble
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Data Characteristics
+
+The dataset encompasses crucial economic information for each country
+and continent worldwide, spanning five-year intervals from 1962 to 2007.
+This data pertains to:
+
+1.  GDP indicators (such as GDP per capita, exports, imports,
+    contributions from various sectors like industry, agriculture,
+    services, and the financial sector, as well as inflation rates).
+2.  Energy metrics (including electric power consumption and overall
+    energy usage).
+3.  CO2 emissions data.
+4.  Societal metrics like life expectancy and fertility rates.
+5.  Population statistics, including total population and population
+    density.
+
+
+## CO2 Emissions vs. GDP per Capita
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+rm(list = ls())
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(kableExtra)
+
+setwd("~/github/skill-assessments/R for Data Science")
+df <- as_tibble(read.csv("gapminder_clean.csv"))
+df <- df %>% select(-1)
+
+head(df) %>%
+  kbl() %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+The correlation between CO2 emissions (metric tons per capita) and GDP
+is highly significant, demonstrating a robust statistical strength, as
+evidenced by a correlation coefficient of 0.93 and an almost negligible
+p-value.
+
+```{r message=FALSE,  warning=FALSE, echo=FALSE}
+df2 <- df %>% 
+   filter(Year == 1962) %>%
+  filter(!is.na(CO2.emissions..metric.tons.per.capita.)) %>%
+  mutate(continent = factor(continent)) 
+
+# Calculate correlation coefficient and p-value
+pear_res <- cor.test(df2$gdpPercap, 
+                df2$CO2.emissions..metric.tons.per.capita.,
+                method = "pearson")
+
+print(paste0("Correlation between CO2 emissions and GDP is:", round(pear_res$estimate,3), 
+             " with a p-value:", pear_res$p.value))
+
+spear_res <- cor.test(df2$gdpPercap, 
+                     df2$CO2.emissions..metric.tons.per.capita.,
+                     method = "spearman")
+```
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+p <- df2 %>%  ggplot(aes(x = gdpPercap, y = CO2.emissions..metric.tons.per.capita.)) +
+  geom_point(aes(size = CO2.emissions..metric.tons.per.capita., color = continent)) +
+  geom_text(aes(label = Country.Name), nudge_x = 300, nudge_y = 0.01, size = 2) +  
+  scale_x_continuous(limits = c(0, 25000)) + 
+  scale_y_log10(labels = scales::label_number(scale = 1e3, suffix = "K")) +  
+  labs(x = "GDP per Capita", y = "CO2 Emissions (metric tons per capita), LOG10",
+       title = "CO2 Emissions vs. GDP per Capita",
+       size = "CO2 Emissions",
+       color = "Continent") + 
+  scale_color_manual(values = c("Asia" = "blue", "Europe" = "green", "Africa" = "red",
+                                "Americas" = "purple", "Oceania" = "orange")) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 12)
+  ) +
+  geom_smooth(method = "lm", se = F, size=.5, alpha=0.5) +
+  geom_text(aes(x=15000, y=0.05, 
+                label = paste0('Pearson:', 
+                               round(pear_res$estimate,2),
+                               ', P-value < 0.001\n',
+                               'Spearman:', 
+                               round(spear_res$estimate,2),
+                               ', P-value < 0.001')
+                ), 
+                color = 'blue',  size=3)
+p
+```
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+df3 <- df %>%
+  group_by(Year) %>%
+  summarize(correlation = cor(CO2.emissions..metric.tons.per.capita., 
+                              gdpPercap, 
+                              use = "complete.obs")) %>%
+  filter(correlation == max(correlation)) 
+cat("The year with the strongest correlation between CO2 Emmissions
+    and GDP Per Capita is:", df3$Year)
+
+```
+
+**Interactive plot**
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+p2 <- p +
+  guides(color = FALSE, size = FALSE)
+ggplotly(p2)
+```
+ ## Relationship Between Continent and Energy use (kg of oil equivalent per capita)
+ 
+To understand the relationship between the categorical variable
+("continent") and the continuous variable ("Energy use (kg of oil
+equivalent per capita)"), we can use analysis of variance (ANOVA) or
+perform a visual analysis using violin plots.
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+model <- lm(Energy.use..kg.of.oil.equivalent.per.capita. ~ continent, data = df)
+anova_result <- anova(model)
+cat(anova_result$`Pr(>F)`[1])
+```
+
+This extremely low p-value indicates that there is a statistically
+significant relationship between"continent" and "Energy use (kg of oil
+equivalent per capita)."
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+pl <- df %>% ggplot(aes(x = continent, y = Energy.use..kg.of.oil.equivalent.per.capita.)) +
+  geom_boxplot(fill = "blue", alpha = 0.7) +
+  labs(x = "Continent", y = "Energy use (kg of oil equivalent per capita)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplotly(pl)
+```
+
+## Comparing Europe and Asia's 'Imports of goods and services (% of GDP)' after 1990
+\
+Since there's only one measurement available for each country per year,
+the total importation used in Europe and Asia remains independent. Given
+this independence, we can choose a paired t-test to analyze any
+potential differences between the energy usage in the two regions.
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+
+total_import_per_country <-  df %>%
+  filter(Year > 1990) %>%
+  group_by(Year, continent, Country.Name) %>%
+  filter(continent != "") %>%
+  summarize(SumImport = sum(Imports.of.goods.and.services....of.GDP., na.rm = TRUE)) %>%
+  filter(Country.Name != "" & SumImport != 0) %>%
+  distinct(Year, Country.Name, continent, .keep_all = TRUE)  %>%
+  ungroup()
+  
+# Group by Year and continent, then summarize to compute total imports per continent
+total_import_per_continent <-  total_import_per_country %>%
+  group_by(Year, continent) %>%
+  summarize(SumImport = sum(SumImport, na.rm = TRUE))
+
+# Filter data for each continent
+europe_data <- total_import_per_continent %>%
+  filter(continent == "Europe") %>%
+  pull(SumImport)
+
+asia_data <- total_import_per_continent %>%
+  filter(continent == "Asia") %>%
+  pull(SumImport)
+
+tres <- t.test(europe_data, asia_data)
+tres
+
+#Create a bar plot using ggplot2
+pl <- ggplot(total_import_per_continent %>% filter(continent %in% c("Asia", "Europe")),
+             aes(x = Year, y = SumImport, fill = continent)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Year", y = "Total Importations", title = "Total Imports By Asia and Europe") +
+  scale_fill_manual(values = c("Asia" = "blue", "Europe" = "green")) + 
+  scale_x_continuous(breaks = seq(1992, 2007, by = 5)) +
+  theme_classic()
+
+ggplotly(pl)
+
+```
+
+Due to the high p-value obtained from the t-test, we can
+conclude that there no substantial and statistically significant
+distinctions in the total importations of goods and services between Europe and
+Asia, spanning the time frame from 1990 onward.
+
+## Identifying The Country with The Largest 'Population Density' Across All Years
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+
+highest_density_by_year <- df %>%
+  group_by(Year, Country.Name) %>%
+  summarize(max_pop_density = max(Population.density..people.per.sq..km.of.land.area., na.rm = TRUE)) %>%
+  arrange(Year, desc(max_pop_density)) %>%
+  group_by(Year) %>%
+  slice(1)
+
+
+plt <- ggplot(highest_density_by_year, aes(x = Year, y = max_pop_density, color = Country.Name)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Year", y = "Max Population Density", 
+       title = "Highest Population Density by Year",
+       color='Country') +
+  theme_minimal() +
+  #theme(legend.position = "none")
+  theme(legend.position = "bottom") +
+  geom_text(aes(label = Country.Name), nudge_y = 5, show.legend = FALSE)   +
+  scale_x_continuous(breaks = seq(1967, 2007, by = 5)) 
+ggplotly(plt)
+```
+
+## Country With the Greatest Increase in 'Life expectancy at birth, total (years)' between 1962 and 2007?
+  
