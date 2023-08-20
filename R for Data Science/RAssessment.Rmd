@@ -4,6 +4,7 @@ author: "Yves Greatti"
 date: "2023-08-19"
 output:
   html_document:
+    css: style.css
     theme: united
     code_folding: hide
     highlight: tango
@@ -128,7 +129,8 @@ p2 <- p +
   guides(color = FALSE, size = FALSE)
 ggplotly(p2)
 ```
- ## Relationship Between Continent and Energy use (kg of oil equivalent per capita)
+
+## Relationship Between Continent and Energy use
  
 To understand the relationship between the categorical variable
 ("continent") and the continuous variable ("Energy use (kg of oil
@@ -143,7 +145,7 @@ cat(anova_result$`Pr(>F)`[1])
 
 This extremely low p-value indicates that there is a statistically
 significant relationship between"continent" and "Energy use (kg of oil
-equivalent per capita)."
+equivalent per capita).", and this is observed in the violin plot:
 
 ```{r message=FALSE, echo=FALSE, warning=FALSE}
 pl <- df %>% ggplot(aes(x = continent, y = Energy.use..kg.of.oil.equivalent.per.capita.)) +
@@ -155,7 +157,7 @@ ggplotly(pl)
 ```
 
 ## Comparing Europe and Asia's 'Imports of goods and services (% of GDP)' after 1990
-\
+
 Since there's only one measurement available for each country per year,
 the total importation used in Europe and Asia remains independent. Given
 this independence, we can choose a paired t-test to analyze any
@@ -203,11 +205,14 @@ ggplotly(pl)
 ```
 
 Due to the high p-value obtained from the t-test, we can
-conclude that there no substantial and statistically significant
+conclude that there is no substantial and statistically significant
 distinctions in the total importations of goods and services between Europe and
 Asia, spanning the time frame from 1990 onward.
 
 ## Identifying The Country with The Largest 'Population Density' Across All Years
+Throughout the period spanning from 1962 to 2007, 
+Monaco and Macao consistently emerge as the leading countries 
+in terms of the highest population density.
 
 ```{r message=FALSE, echo=FALSE, warning=FALSE}
 
@@ -233,5 +238,56 @@ plt <- ggplot(highest_density_by_year, aes(x = Year, y = max_pop_density, color 
 ggplotly(plt)
 ```
 
-## Country With the Greatest Increase in 'Life expectancy at birth, total (years)' between 1962 and 2007?
+## Country With the Greatest Increase in Life Expectancy Between 1962 And 2007
+
+The nations that experienced the most significant positive growth 
+in life expectancy from 1962 to 2007 are as follows:
+
+* Maldives
+* Bhutan
+* Timor-Leste
+* Tunisia
+
+Conversely, the countries witnessing the most noteworthy decline 
+in life expectancy during this period are:
+
+* Ukraine
+* Lesotho
+* Zimbabwe
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+greatest_increase_in_life_expectancy <- df %>%
+  filter(Year %in% c(1962, 2007)) %>%
+  group_by(Country.Name) %>%
+  reframe(
+    increase_in_life_expectancy = diff(Life.expectancy.at.birth..total..years.),
+    start_life_expectancy = first(Life.expectancy.at.birth..total..years.),
+    end_life_expectancy = last(Life.expectancy.at.birth..total..years.)
+  ) %>%
+  filter(!is.na(start_life_expectancy) & !is.na(end_life_expectancy)) %>%
+  arrange(desc(increase_in_life_expectancy))
+
+# Select the top 20 most positive increases and the top 20 most negative increases
+top_positive <- greatest_increase_in_life_expectancy %>%
+  slice(1:10)
+
+top_negative <- greatest_increase_in_life_expectancy %>%
+  filter(increase_in_life_expectancy <=0)
+
+# Combine the datasets for plotting
+top_changes <- bind_rows(top_positive, top_negative)
+
+
+plt <- ggplot(top_changes,
+              aes(x = reorder(Country.Name, increase_in_life_expectancy), 
+                  y = increase_in_life_expectancy)) +
+  geom_bar(stat = "identity", fill = "blue", alpha = 0.7) +
+  labs(x = "Country", y = "Increase in Life Expectancy",
+       title = "Greatest Increase in Life Expectancy (1962 to 2007)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip()
+
+ggplotly(plt)
+```
   
