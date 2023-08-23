@@ -1,8 +1,6 @@
 rm(list = ls())
 
 
-#library(tidyverse)
-
 # Create an empty 3x3 matrix to represent the tic-tac-toe board
 
 num_rows <- 3
@@ -144,15 +142,21 @@ if (interactive()) {
 num_round <- 1
 player_symbol <- read_symbol()
 computer_sym <- other_player(player_symbol)
-curr_symbol <- player_symbol
+curr_symbol <- "X"
+
+last_round <- F
 
 while (TRUE) {
   cat("\n")
-  display_round(num_round)
+  if(!(last_round > 0)){ 
+    display_round(num_round)
+  }
   cat("\nCurrent board:\n")
   cat("~~~~~~~~~~~~~~\n")
   display_board(board)
   cat("~~~~~~~~~~~~~~~\n\n")
+  if (last_round) 
+    break
   num_round <- num_round + 1
   cat(paste0("Player '", curr_symbol, "' turn:\n"))
   if (curr_symbol == player_symbol) {
@@ -186,11 +190,10 @@ while (TRUE) {
   }
   if (check_win(board, curr_symbol)) {
     cat(paste0(curr_symbol, " wins!!\n\n"))
-    break
-  }
-  if (check_draw(board)) {
+    last_round <- T
+  } else if (check_draw(board)) {
     cat("It's a draw!")
-    break
+    last_round <- T
   }
   curr_symbol <- other_player(curr_symbol)
 }
