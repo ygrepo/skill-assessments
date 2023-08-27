@@ -23,4 +23,4 @@ A: 3.47
 
 Q6: What is the median number of variants per sample in this data set?
 
-A:55.427
+A:28
